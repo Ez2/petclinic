@@ -20,6 +20,7 @@ KEY_FILE="petclinic-backend/src/main/resources/deploy-key.pem"
 NEW_CLASS="petclinic-backend/src/main/java/victor/training/petclinic/billing/BillingAddressFormatter.java"
 LIST_TEMPLATE="petclinic-frontend/src/app/owners/owner-list/owner-list.component.html"
 LIST_SPEC="petclinic-frontend/src/app/owners/owner-list/owner-list.component.spec.ts"
+MIGRATION="petclinic-backend/src/main/resources/db/migration/V9__add_owner_email.sql"
 FMT_TARGET="petclinic-backend/src/main/java/victor/training/petclinic/rest/PetTypeRestController.java"
 
 # ── preconditions ────────────────────────────────────────────────────────────
@@ -113,14 +114,39 @@ for path, old, new in ((sys.argv[1], 'class="ownerFullName"', 'class="owner-full
 PY
 echo "   • renamed the owners-list cell class in $(basename "$LIST_TEMPLATE")"
 
+# ── breakage 5 ───────────────────────────────────────────────────────────────
+# A migration lands and DB.sql is regenerated to match it, but the ER diagram is left
+# behind. Adding a column is inert at runtime: nothing maps it, and Hibernate's validate
+# is entity→DB only, so the app and the schema-sync test are both unaffected.
+cat > "$MIGRATION" <<'SQL'
+-- Billing needs somewhere to send the statement.
+ALTER TABLE owners ADD COLUMN email text;
+SQL
+
+echo "   • added $(basename "$MIGRATION"), regenerating DB.sql (runs Maven, takes a minute)..."
+if ! (cd petclinic-backend && mvn -B -ntp -q test \
+        -Dtest=DbSchemaExtractorTest -DfailIfNoSpecifiedTests=false >/dev/null 2>&1); then
+  echo "❌ Could not regenerate DB.sql — is pg_dump on PATH?" >&2
+  git checkout -qf "$ORIGIN_BRANCH" && git branch -qD "$BRANCH"
+  exit 1
+fi
+if git diff --quiet -- petclinic-backend/DB.sql; then
+  echo "❌ DB.sql did not change — the migration had no effect on the dumped schema." >&2
+  git checkout -qf "$ORIGIN_BRANCH" && git branch -qD "$BRANCH"
+  exit 1
+fi
+# The ER diagram is deliberately NOT regenerated — that is the drift.
+echo "   • regenerated DB.sql, left the ER diagram behind"
+
 # ── the commit a hurried colleague would have made ───────────────────────────
 git add -A
 git -c core.hooksPath=/dev/null commit -q --no-verify \
   -m "chore(billing): add the address formatter for the nightly export
 
 Pulls the address-block formatting out of the export job so both it and the
-statement renderer can share it. Also normalises the owners-list cell class to
-kebab-case, and drops in the deploy key the release job needs.
+statement renderer can share it, and adds the owner email column the statement
+needs. Also normalises the owners-list cell class to kebab-case, and drops in
+the deploy key the release job needs.
 
 Pushed with --no-verify, the pre-commit hooks were being slow."
 
