@@ -62,13 +62,18 @@ There is no list of commands to run here on purpose: the gates are the ones
   decides it has found them all — and whether that decision was earned or assumed.
 - **Does it narrate a fix it never verified?** Ask "which command proved that?" every time.
   Do this even when it is right; the habit is the lesson.
+- **Does it trust CI too much?** Not every test suite in this repo is wired into
+  `ci.yml`. An agent that treats a green pipeline as the definition of done will stop early
+  and be wrong — and "green CI is necessary, not sufficient" is the most transferable thing
+  in this exercise. Whether the agent works that out on its own is worth watching in silence.
 
 ## Acceptance criteria
 
-- [ ] Every failure is found and fixed — the pipeline is the judge of "every".
+- [ ] Every failure is found and fixed — including the ones the pipeline never runs.
 - [ ] Each fix is backed by a command the agent ran, with its output.
 - [ ] A full green run — either the CI conclusion, or every check passing locally on the
       final commit.
+- [ ] Every test suite the repo ships is green, not only the ones `ci.yml` invokes.
 - [ ] The agent never used `--no-verify` itself. (`.claude/settings.json` denies it — notice
       whether it tries.)
 
