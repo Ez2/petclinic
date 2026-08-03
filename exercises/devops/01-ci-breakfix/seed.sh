@@ -18,6 +18,8 @@ BRANCH="exercise/ci-breakfix"
 STATE="$(git rev-parse --git-dir)/petclinic-exercise-01-origin"
 KEY_FILE="petclinic-backend/src/main/resources/deploy-key.pem"
 NEW_CLASS="petclinic-backend/src/main/java/victor/training/petclinic/billing/BillingAddressFormatter.java"
+LIST_TEMPLATE="petclinic-frontend/src/app/owners/owner-list/owner-list.component.html"
+LIST_SPEC="petclinic-frontend/src/app/owners/owner-list/owner-list.component.spec.ts"
 FMT_TARGET="petclinic-backend/src/main/java/victor/training/petclinic/rest/PetTypeRestController.java"
 
 # ── preconditions ────────────────────────────────────────────────────────────
@@ -32,7 +34,7 @@ if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
   exit 1
 fi
 
-for f in "$FMT_TARGET"; do
+for f in "$FMT_TARGET" "$LIST_TEMPLATE" "$LIST_SPEC"; do
   [ -f "$f" ] || { echo "❌ Expected file missing: $f" >&2; exit 1; }
 done
 
@@ -96,14 +98,29 @@ else
 fi
 echo "   • wrote $KEY_FILE"
 
+# ── breakage 4 ───────────────────────────────────────────────────────────────
+# A CSS class is renamed in the owners list and the Karma spec next to it is updated to
+# match — but the e2e suite lives in another module and keeps the old selector. Nothing
+# styles this class, so the rendered page is unchanged and the app runs exactly as before.
+python3 - "$LIST_TEMPLATE" "$LIST_SPEC" <<'PY'
+import sys
+for path, old, new in ((sys.argv[1], 'class="ownerFullName"', 'class="owner-full-name"'),
+                       (sys.argv[2], "By.css('.ownerFullName')", "By.css('.owner-full-name')")):
+    text = open(path, encoding='utf-8').read()
+    if old not in text:
+        sys.exit("expected to find %r in %s" % (old, path))
+    open(path, 'w', encoding='utf-8').write(text.replace(old, new))
+PY
+echo "   • renamed the owners-list cell class in $(basename "$LIST_TEMPLATE")"
+
 # ── the commit a hurried colleague would have made ───────────────────────────
 git add -A
 git -c core.hooksPath=/dev/null commit -q --no-verify \
   -m "chore(billing): add the address formatter for the nightly export
 
 Pulls the address-block formatting out of the export job so both it and the
-statement renderer can share it. Also drops in the deploy key the release job
-needs.
+statement renderer can share it. Also normalises the owners-list cell class to
+kebab-case, and drops in the deploy key the release job needs.
 
 Pushed with --no-verify, the pre-commit hooks were being slow."
 
