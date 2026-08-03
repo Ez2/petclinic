@@ -17,7 +17,7 @@ cd "$ROOT"
 BRANCH="exercise/ci-breakfix"
 STATE="$(git rev-parse --git-dir)/petclinic-exercise-01-origin"
 KEY_FILE="petclinic-backend/src/main/resources/deploy-key.pem"
-MIGRATION="petclinic-backend/src/main/resources/db/migration/V9__rename_owner_city.sql"
+NEW_CLASS="petclinic-backend/src/main/java/victor/training/petclinic/billing/BillingAddressFormatter.java"
 FMT_TARGET="petclinic-backend/src/main/java/victor/training/petclinic/rest/PetTypeRestController.java"
 
 # ── preconditions ────────────────────────────────────────────────────────────
@@ -60,11 +60,26 @@ PY
 echo "   • touched $(basename "$FMT_TARGET")"
 
 # ── breakage 2 ───────────────────────────────────────────────────────────────
-cat > "$MIGRATION" <<'SQL'
--- Align the owner address block with the naming used by the billing export.
-ALTER TABLE owners RENAME COLUMN city TO town;
-SQL
-echo "   • added $(basename "$MIGRATION")"
+# Deliberately inert at runtime: nothing references it, it depends on nothing, and the
+# app boots and serves traffic exactly as before. The exercise must stay runnable.
+mkdir -p "$(dirname "$NEW_CLASS")"
+cat > "$NEW_CLASS" <<'JAVA'
+package victor.training.petclinic.billing;
+
+/**
+ * Formats an owner's address block the way the nightly billing export expects it.
+ */
+public class BillingAddressFormatter {
+
+    private BillingAddressFormatter() {
+    }
+
+    public static String format(String address, String city) {
+        return address + ", " + city.toUpperCase();
+    }
+}
+JAVA
+echo "   • added $(basename "$NEW_CLASS")"
 
 # ── breakage 3 ───────────────────────────────────────────────────────────────
 # Generated here and now, so no credential-shaped text lives in this repo's history
@@ -84,10 +99,11 @@ echo "   • wrote $KEY_FILE"
 # ── the commit a hurried colleague would have made ───────────────────────────
 git add -A
 git -c core.hooksPath=/dev/null commit -q --no-verify \
-  -m "chore(deploy): align owner address columns with billing export
+  -m "chore(billing): add the address formatter for the nightly export
 
-Renames owners.city to owners.town so the nightly billing export stops
-special-casing it. Also drops in the deploy key the release job needs.
+Pulls the address-block formatting out of the export job so both it and the
+statement renderer can share it. Also drops in the deploy key the release job
+needs.
 
 Pushed with --no-verify, the pre-commit hooks were being slow."
 
