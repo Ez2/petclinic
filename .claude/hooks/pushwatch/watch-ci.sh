@@ -87,6 +87,18 @@ if [ "$conclusion" = "success" ]; then
   exit 0
 fi
 
+# A run can report conclusion=failure while its jobs were CANCELLED without ever
+# being assigned a runner (Actions outage, capacity shortage). Zero steps ran, so
+# no gate actually evaluated the code and there is nothing to repair — treat it as
+# indeterminate, never red. Observed for real: 2026-08-06, both workflows on this
+# repo reported failure with runner=none and steps=0 during an Actions major outage.
+started=$(gh run view "$id" --json jobs \
+            --jq '[.jobs[] | select((.steps | length) > 0)] | length' 2>/dev/null)
+if [ "${started:-0}" = "0" ]; then
+  echo "⚠️ No job in run $id ever started (no runner assigned) for $short — infrastructure, NOT a red build. $run_url"
+  exit 0
+fi
+
 if is_failure_conclusion "$conclusion"; then
   echo "CI FAILED ($conclusion) for $short — $run_url"
   exit 1
