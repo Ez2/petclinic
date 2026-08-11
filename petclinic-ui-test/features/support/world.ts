@@ -51,14 +51,16 @@ export class PlaywrightWorld extends World {
 
 setWorldConstructor(PlaywrightWorld);
 
-// Start each regenerating run from a clean slate: drop every previously
-// generated .puml and any stale recorded windows, so the diagrams left behind
-// are exactly the ones this run produces.
+// Drop this run's recorded windows so the diagrams regenerated below come only
+// from scenarios that just ran.
+//
+// Deliberately NOT wiping every .puml in DIAGRAMS_DIR: the plain-TypeScript
+// twins (../*.spec.ts, run by Playwright) write their diagrams into the same
+// folder, and a blanket wipe here would delete theirs — including
+// owner-search's, whose @generate_sequence tag now lives only on that side.
+// run-tests-with-tracing.sh clears the folder once, before running either suite.
 BeforeAll(function () {
   fs.mkdirSync(DIAGRAMS_DIR, {recursive: true});
-  for (const f of fs.readdirSync(DIAGRAMS_DIR)) {
-    if (f.endsWith('.puml')) fs.rmSync(path.join(DIAGRAMS_DIR, f));
-  }
   fs.rmSync(WINDOWS_FILE, {force: true});
 });
 
