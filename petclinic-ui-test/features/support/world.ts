@@ -6,6 +6,7 @@ import {Browser, BrowserContext, chromium, Page} from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import {appendWindow} from '../../tests/support/trace-window-store';
+import {flushBrowserSpans} from '../../tests/support/otel-flush';
 import {shouldGenerateSequence} from '../../src/trace-diagram/sequence-tag';
 import {runGenerate} from '../../src/trace-diagram/generate';
 
@@ -72,6 +73,7 @@ Before(async function (this: PlaywrightWorld, {pickle}: ITestCaseHookParameter) 
 
 After(async function (this: PlaywrightWorld) {
   if (this.traceTitle && this.traceStartMs !== undefined) {
+    await flushBrowserSpans(this.page);
     appendWindow(WINDOWS_FILE, {
       title: this.traceTitle,
       startMs: this.traceStartMs,
