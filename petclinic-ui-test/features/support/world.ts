@@ -9,6 +9,7 @@ import {appendWindow} from '../../tests/support/trace-window-store';
 import {flushBrowserSpans} from '../../tests/support/otel-flush';
 import {shouldGenerateSequence} from '../../src/trace-diagram/sequence-tag';
 import {runGenerate} from '../../src/trace-diagram/generate';
+import {OwnerSearch} from '../dsl/owner-search.dsl';
 
 setDefaultTimeout(60_000);
 
@@ -29,9 +30,8 @@ export class PlaywrightWorld extends World {
   petId?: number;
   visitDescription?: string;
   // Set by the owner-search scenario: the last-name part typed into the filter
-  // and the owner full names the API returns for it (the expected result set).
-  searchPrefix?: string;
-  expectedFullNames?: string[];
+  // plus the owner full names the API returns for it (the expected result set).
+  ownerSearch?: OwnerSearch;
   // Set only for @generate_sequence scenarios: the title + start of the Tempo
   // search window whose traces become a sequence diagram.
   traceTitle?: string;
@@ -39,6 +39,13 @@ export class PlaywrightWorld extends World {
 
   constructor(options: IWorldOptions) {
     super(options);
+  }
+
+  requireOwnerSearch(): OwnerSearch {
+    if (!this.ownerSearch) {
+      throw new Error('Expected a search prefix to have been chosen earlier in the scenario');
+    }
+    return this.ownerSearch;
   }
 }
 
