@@ -53,11 +53,13 @@ if ((${#down[@]})); then
 fi
 log "✅ Stack reachable (Grafana, Tempo/OTLP, Postgres, backend+agent, frontend)."
 
-# Heads-up if the backend is running WITHOUT the OTel agent — tests would pass
-# but no traces would be recorded, so no diagrams would be produced.
-if ! http_up "http://localhost:$GRAFANA_PORT/api/datasources/proxy/uid/tempo/api/echo"; then
-  warn "Could not reach the Tempo proxy echo endpoint — diagram generation may find no traces."
+# The backend only attaches the OTel agent when :4318 was already up at boot, so
+# a backend started before Grafana passes every check above yet emits no traces.
+backend_pid="$(lsof -nP -iTCP:$BACKEND_PORT -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+if [[ -n "$backend_pid" ]] && ! ps -o command= -p "$backend_pid" 2>/dev/null | grep -q 'opentelemetry-javaagent.jar'; then
+  die "Backend on :$BACKEND_PORT is running WITHOUT the OpenTelemetry agent — restart it (./start-backend.sh) first."
 fi
+log "✅ Backend has the OpenTelemetry agent attached."
 
 # --- run the suite ---------------------------------------------------------
 log "Running e2e tests with tracing…"
