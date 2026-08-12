@@ -7,17 +7,12 @@ Feature: Search owners by last name
   # The field's whole contract is a table of what-you-type / who-shows-up, which
   # is exactly what a Scenario Outline says better than code: one sentence, many
   # rows, readable by whoever owns the requirement.
-  #
-  # @generate_sequence sits on a single Examples block, not on the outline, so
-  # exactly one row records a Tempo window and becomes a .puml — the other rows
-  # run as plain assertions.
   Scenario Outline: Filter owners by a last name part
     Given the clinic's sample owners are loaded
     When I open the owners page
     And I search owners for "<search>"
     Then exactly these owners are listed: "<owners>"
 
-    @generate_sequence
     Examples: a last name two owners share
       | search | owners                       |
       | Potter | Harry Potter, Beatrix Potter |
@@ -33,7 +28,11 @@ Feature: Search owners by last name
       | Zzzz    |                                                               |
 
   # The one row a table cannot hold: an empty field takes a different branch in
-  # the UI — it re-lists everyone instead of calling the search endpoint.
+  # the UI — it re-lists everyone instead of calling the search endpoint. That
+  # branch is the one worth a diagram, so @generate_sequence sits here: it is
+  # the round-trip the Examples rows only vary, and tagging one plain Scenario
+  # beats tagging a table row nobody can point at.
+  @generate_sequence
   Scenario: Emptying the last name field brings every owner back
     Given the clinic's sample owners are loaded
     When I open the owners page
